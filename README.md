@@ -1,12 +1,24 @@
 # CivitAI Auto Liker 🤯
 
+## Table of Contents:
+
+- [Features](#features)
+- [Get started](#get-started)<br>
+### What to expect
+- [First run](#first-run)
+- [Next runs](#next-runs)
+### Important
+- [Important](#important)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing-if-you-r-not-lazy-ass)
+- [Disclaimer](#disclaimer)
 
 ## Features
 - Auto liking images to get buzz
 - I farted👍
 - 100% **safe** (trust me)
 
-  ## Get started
+## Get started
 - Copy this repository
 ```
 git clone https://github.com/your-username/civitai-auto-liker.git
@@ -53,7 +65,7 @@ cd civitai-auto-liker
 >- After first run, set ```HEADLESS_MODE = True``` for stealth (not neccessary)<br>
 >- Your data stays local
 
-##Troubleshooting
+## Troubleshooting
 
 ### Some troubles:
 - Wrong email or other data in config.py. Check for errors
