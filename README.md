@@ -9,7 +9,7 @@
 - [Next runs](#next-runs)
 ### Important
 - [Important](#important)
-- [Troubleshooting](#troubleshooting)
+- [Troubleshooting](#troubleshooting--faq)
 - [Contributing](#contributing-if-you-r-not-lazy-ass)
 - [Disclaimer](#disclaimer)
 
@@ -33,28 +33,17 @@ cd civitai-auto-liker
   
   - Run using
   ```
-  python civitai_auto_liker.py
+  python civitai_auto_like.py
   ```
 ## What to Expect
 ### First Run:
 
-- Script accesses your email
-
-- Finds CivitAI login email and extracts magic link
-
-- Automatically logs you in through browser
-
-- Likes 50 fresh images
-
-- Saves session for future laziness
+- Before running script, please, go to https://civitai.com/login?returnUrl=%2Fimages&reason=switch-accounts, and send login link to your email<br>
+- Run the scipt
 
 ### Next Runs:
 
-- Just execute script → instant liking
-
 - No email access needed
-
-- Pure automation magic
 
 ## Important
 <div align="center" style="background-color:#e6f7ff; padding:10px; border-radius:5px; margin:20px 0;"> <strong>⚠️ Your Data is SAFE ⚠️</strong><br> • Email credentials only used locally<br> • Session stored ONLY on your machine<br> • No data sent to external servers<br> • Open source - inspect the code yourself! </div>
@@ -62,14 +51,19 @@ cd civitai-auto-liker
 > [!IMPORTANT]
 >- Might violate CivitAI's TOS (use responsibly!)<br>
 >- Don't run too frequently - pretend you're human<br>
->- After first run, set ```HEADLESS_MODE = True``` for stealth (not neccessary)<br>
+>- HIGHLY NOR RECOMMENDED to set ```HEADLESS_MODE = True```, bc this script is sooo bad, and it may cause bugs<br>
 >- Your data stays local
 
-## Troubleshooting
+## Troubleshooting & FAQ
 
-### Some troubles:
-- Wrong email or other data in config.py. Check for errors
-- CivitAI changed site design (open issue)
+### Script doesn't work!!!
+- A: Try pressing the "Add Emote" button (the "+" icon next to the emotes)
+
+### Script presses on already liked images
+- A: Idk, wait for the fix or go, and press like images for yourself, lazy asshole
+
+### How to support developer?
+- A: Like fuck I will! I'm too fucking lazy to add any goddamn payment methods. Deal with it
 
 ## Contributing (if you r not lazy ass)
 
