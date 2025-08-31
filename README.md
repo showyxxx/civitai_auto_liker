@@ -60,7 +60,7 @@ cd civitai-auto-liker
 - A: Try pressing the "Add Emote" button (the "+" icon next to the emotes)
 
 ### Script presses on already liked images
-- A: Idk, wait for the fix or go, and press like images for yourself, lazy asshole
+- A: Idk, wait for the fix or go, and like images for yourself, lazy asshole
 
 ### How to support developer?
 - A: Like fuck I will! I'm too fucking lazy to add any goddamn payment methods. Deal with it
