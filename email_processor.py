@@ -1,59 +1,96 @@
 # email_processor and blah blah blah
 import imaplib
 import email
-from email.header import decode_header
+import re
 from bs4 import BeautifulSoup
 from config import YOUR_EMAIL, EMAIL_PASSWORD, IMAP_SERVER, IMAP_PORT
 
 def get_civitai_login_link():
-    """get link from civitai mail and fuck it"""
-    print(f"🔍 Checking your mail {YOUR_EMAIL}...")
+    """Extract login link from CivitAI email"""
+    print(f"Checking email: {YOUR_EMAIL}")
     
     try:
-        # connect to mail server
+        # connect to fucking servers
         mail = imaplib.IMAP4_SSL(IMAP_SERVER, IMAP_PORT)
         mail.login(YOUR_EMAIL, EMAIL_PASSWORD)
+        print("Connected to mail server")
+        
+        # check your mothe...
         mail.select("inbox")
         
-        # keep searching, we need to find who asking... oh...
+        # civitai and uhm
         status, messages = mail.search(None, '(FROM "noreply@civitai.com")')
         if status != "OK" or not messages[0]:
-            raise Exception("✉️ Mail from CivitAi not found")
+            # count
+            status, all_messages = mail.search(None, "ALL")
+            if status == "OK" and all_messages[0]:
+                email_count = len(all_messages[0].split())
+                print(f"Found {email_count} emails, but none from CivitAI")
+            raise Exception("No emails found from CivitAI")
         
-        # taking last mail and fuck it again
+        # email id
         email_ids = messages[0].split()
         latest_email_id = email_ids[-1]
+        print(f"Found CivitAI email (ID: {latest_email_id.decode()})")
         
+        # fetch
         status, msg_data = mail.fetch(latest_email_id, "(RFC822)")
         if status != "OK":
-            raise Exception("❌ Error when receiving an email!")
+            raise Exception("Failed to fetch email content")
         
-        # parsing... brain not found
+        # parse
         msg = email.message_from_bytes(msg_data[0][1])
         login_link = None
         
-        # searching for brain in HTML-code
+        # search
         for part in msg.walk():
             if part.get_content_type() == "text/html":
                 html_content = part.get_payload(decode=True).decode()
+                
+                # save
+                with open("civitai_email.html", "w", encoding="utf-8") as f:
+                    f.write(html_content)
+                
+                # parse 2
                 soup = BeautifulSoup(html_content, 'html.parser')
                 
-                # searching brain in "Log in button"
-                login_button = soup.find('a', string=lambda t: t and "Log in" in t)
+                # search 2
+                patterns = [
+                    lambda t: t and "log in" in t.lower(),
+                    lambda t: t and "sign in" in t.lower(),
+                    lambda t: t and "access your account" in t.lower(),
+                    lambda t: t and "click here" in t.lower(),
+                ]
                 
-                if login_button and login_button.has_attr('href'):
-                    login_link = login_button['href']
-                    break
+                # txt patterns
+                for pattern in patterns:
+                    link = soup.find('a', string=pattern)
+                    if link and link.get('href'):
+                        login_link = link['href']
+                        break
+                
+                # search url
+                if not login_link:
+                    all_links = soup.find_all('a', href=True)
+                    for link in all_links:
+                        if 'civitai.com/api/auth/callback/email' in link['href']:
+                            login_link = link['href']
+                            break
         
+        # cleanup
         mail.close()
         mail.logout()
         
         if not login_link:
-            raise Exception("❌ There is no login link found in email")
+            print("Saved email content to civitai_email.html for inspection")
+            raise Exception("Login link not found in email")
         
-        print(f"✅ Successfully get login link")
+        print(f"Found login link: {login_link[:70]}...")
         return login_link
     
     except Exception as e:
-        print(f"❌ Error during processing email: {e}")
+        print(f"Email processing error: {str(e)}")
+        # AAAAAAA ERRORS AAAAAA BHASBHJSAHBJSAJHB
+        print(f"IMAP Server: {IMAP_SERVER}:{IMAP_PORT}")
+        print(f"Email: {YOUR_EMAIL}")
         raise
