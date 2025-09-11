@@ -1,77 +1,85 @@
-# CivitAI Auto Liker 🤯
+# CivitAI Auto Liker
 
-## Table of Contents:
-
+## Table of Contents
 - [Features](#features)
-- [Get started](#get-started)<br>
-### What to expect
-- [First run](#first-run)
-- [Next runs](#next-runs)
-### Important
-- [Important](#important)
-- [Troubleshooting](#troubleshooting--faq)
-- [Contributing](#contributing-if-you-r-not-lazy-ass)
+- [Getting Started](#getting-started)
+  - [First Run](#first-run)
+  - [Subsequent Runs](#subsequent-runs)
+- [Important Notes](#important-notes)
+- [Troubleshooting & FAQ](#troubleshooting--faq)
+- [Contributing](#contributing)
 - [Disclaimer](#disclaimer)
 
+---
+
 ## Features
-- Auto liking images to get buzz
-- I farted👍
-- 100% **safe** (trust me)
+- Automatically like images to boost activity.
+- Simple and lightweight.
+- Safe: session data stays local.
 
-## Get started
-- Copy this repository
-```
-git clone https://github.com/your-username/civitai-auto-liker.git
-cd civitai-auto-liker
-```
-  - Install dependencies
-  ```
-  pip install -r requirements.txt
-  playwright install chromium
-  ```
-  - Edit [config.py](config.py)
-  
-  - Run using
-  ```
-  python civitai_auto_like.py
-  ```
-## What to Expect
-### First Run:
+---
 
-- Before running script, please, go to https://civitai.com/login?returnUrl=%2Fimages&reason=switch-accounts, and send login link to your email<br>
-- Run the scipt
+## Getting Started
 
-### Next Runs:
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/showyxxx/civitai-auto-liker.git
+   cd civitai-auto-liker
+   ```
 
-- No email access needed
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   playwright install chromium
+   ```
 
-## Important
-<div align="center" style="background-color:#e6f7ff; padding:10px; border-radius:5px; margin:20px 0;"> <strong>⚠️ Your Data is SAFE ⚠️</strong><br> • Email credentials only used locally<br> • Session stored ONLY on your machine<br> • No data sent to external servers<br> • Open source - inspect the code yourself! </div>
+3. Configure settings in [config.py](config.py).
 
-> [!IMPORTANT]
->- Might violate CivitAI's TOS (use responsibly!)<br>
->- Don't run too frequently - pretend you're human<br>
->- HIGHLY NOR RECOMMENDED to set ```HEADLESS_MODE = True```, bc this script is sooo bad, and it may cause bugs<br>
->- Your data stays local
+4. Run the script:
+   ```bash
+   python civitai_auto_like.py
+   ```
+
+### First Run
+- Obtain the login link from your email before running the script.
+- This is required only for the first session.
+
+### Subsequent Runs
+- Email access is no longer required.
+- The script will use the saved session.
+
+---
+
+## Important Notes
+
+- **Data Safety:** Your email and session data stay local and are never sent externally.
+- **TOS:** Use responsibly; frequent automated actions might violate CivitAI's terms.
+- **Headless Mode:** Running in headless mode may cause issues. Recommended: `HEADLESS_MODE = False`.
+
+---
 
 ## Troubleshooting & FAQ
 
-### Script doesn't work!!!
-- A: Try pressing the "Add Emote" button (the "+" icon next to the emotes)
+**Q:** Script doesn't work?
+- **A:** Try pressing the "+" button (Add Emote) manually first.
 
-### Script presses on already liked images
-- A: Idk, wait for the fix or go, and like images for yourself, lazy asshole
+**Q:** Script clicks already liked images?
+- **A:** This should be minimized with the latest version, but some edge cases may occur.
 
-### How to support developer?
-- A: Like fuck I will! I'm too fucking lazy to add any goddamn payment methods. Deal with it
+**Q:** How can I support the developer?
+- **A:** Contribution via GitHub issues, forks, and PRs is welcome. No monetary support needed.
 
-## Contributing (if you r not lazy ass)
+---
 
-**Found a bug?** - Open issue with tag "Bug"<br>
-**Got an idea?** - Open issue with tag "Idea"<br>
-**Any other questions?** - Open issue with tag "Question"<br>
-**Want to fork or smth?** Please, fork with pleasure
+## Contributing
+
+- Found a bug? Open an issue with the "Bug" tag.
+- Got an idea? Open an issue with the "Idea" tag.
+- Questions? Open an issue with the "Question" tag.
+- Want to fork? Go ahead!
+
+---
 
 ## Disclaimer
 
-This script is for **educational** purposes. Not responsible if your account turns into a pumpkin. Use **wisely** and occasionally like manually - good for your motor skills!
+This script is for **educational purposes**. Use responsibly. We are not responsible for any account issues. Regular manual interaction is recommended.
