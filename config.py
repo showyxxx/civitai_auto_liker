@@ -7,4 +7,8 @@ IMAP_PORT = 993                         # port IMAP (by default 993 for SSL)
 
 
 # browser settings
+
 HEADLESS_MODE = False  # True - stealth mode, False - idk... mb normal mode
+SESSION_SAVE_DELAY = 5  # maybe session settings
+ACTION_DELAY = 1  # delay
+AUTO_WAIT_FOR_USER = True  # wait for user response (recommended = True)
