@@ -24,4 +24,5 @@ UPDATE_BRANCH = "main"  # higly NOT recommended to change this option; 2 availab
 
 
 
-CURRENT_VERSION = "v1.0.0"
+CURRENT_VERSION = "v1.0.1"
+
