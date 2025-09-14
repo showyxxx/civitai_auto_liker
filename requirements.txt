@@ -1,4 +1,2 @@
 playwright>=1.44.0
-beautifulsoup4==4.12.3
-imaplib2>=3.6
 
