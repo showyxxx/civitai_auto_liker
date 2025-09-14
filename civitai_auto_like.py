@@ -1,34 +1,62 @@
+# civitai_auto_like.py
+# Full main script. If session invalid -> open system browser to login URL and WAIT for user.
+# After user presses Enter, fetch magic link via email_processor, complete login in Playwright,
+# save session, then continue with liking loop.
+# Single-line comments, prints in English
+
+import os
+import sys
 import time
 import random
-import os
 import json
 import tempfile
-import sys
+import shutil
+import subprocess
+import webbrowser
+from pathlib import Path
+
 from playwright.sync_api import sync_playwright
+
 import config
 from email_processor import get_civitai_login_link
 
-# config defaults
+# ---------------- Configs (with defaults) ----------------
 YOUR_EMAIL = getattr(config, "YOUR_EMAIL", "<unknown>")
 HEADLESS_MODE = getattr(config, "HEADLESS_MODE", False)
 SESSION_SAVE_DELAY = getattr(config, "SESSION_SAVE_DELAY", 5)
-ACTION_DELAY = getattr(config, "ACTION_DELAY", 2.0)
+ACTION_DELAY = getattr(config, "ACTION_DELAY", 0.5)
 TARGET_LIKES = getattr(config, "TARGET_LIKES", 50)
 CLICK_RETRY = getattr(config, "CLICK_RETRY", 1)
 LIKE_CONFIRM_TIMEOUT = getattr(config, "LIKE_CONFIRM_TIMEOUT", 3.0)
 AUTO_WAIT_FOR_USER = getattr(config, "AUTO_WAIT_FOR_USER", True)
 
-# files
+# Updater settings
+UPDATE_BRANCH = getattr(config, "UPDATE_BRANCH", "main")
+AUTO_UPDATE = getattr(config, "AUTO_UPDATE", False)
+
+# Files & URLs
 SESSION_FILE = "civitai_session.json"
 LIKED_FILE = "liked_images.json"
+LOGIN_FIXED_URL = "https://civitai.com/login?returnUrl=%2Fimages&reason=switch-accounts"
+IMAGES_URL = "https://civitai.com/images?sort=Newest"
 
-# selectors
+# Selectors
 BUTTON_SELECTOR_PRIMARY = 'button[class*="Reactions_reactionBadge"]'
 BUTTON_SELECTOR_FALLBACK = 'button:has(p:has-text("👍")), button:has-text("👍")'
 REACTIONS_PANEL_SVG = 'button:has(svg.tabler-icon-plus):has(svg.tabler-icon-mood-smile)'
 REACTIONS_PANEL_BUTTON = 'button:has(svg.tabler-icon-mood-smile)'
 
-# mask email for logs
+# Send button candidates (kept for potential future usage)
+SEND_BUTTON_SELECTORS = [
+    'button:has-text("Send login link")',
+    'button:has-text("Send login")',
+    'button:has-text("Send link")',
+    'button:has-text("Send")',
+    'button[type="submit"]',
+    'button:has-text("Continue")',
+]
+
+# ---------------- Utility helpers ----------------
 def mask_email(email: str) -> str:
     # mask email keeping first and last char of local-part
     try:
@@ -41,8 +69,9 @@ def mask_email(email: str) -> str:
     except Exception:
         return "***"
 
-# load liked ids from file
+# -------- liked ids helpers --------
 def load_liked_ids():
+    # load previously liked image ids from json
     if os.path.exists(LIKED_FILE):
         try:
             with open(LIKED_FILE, "r", encoding="utf-8") as f:
@@ -53,8 +82,8 @@ def load_liked_ids():
             return set()
     return set()
 
-# atomic save liked ids
 def save_liked_ids_atomic(liked_ids):
+    # atomic write for liked ids file
     tmp_fd, tmp_path = tempfile.mkstemp(prefix="liked_", suffix=".json", dir=".")
     try:
         with os.fdopen(tmp_fd, "w", encoding="utf-8") as f:
@@ -67,8 +96,9 @@ def save_liked_ids_atomic(liked_ids):
             pass
         print("WARNING: failed to save liked file:", e)
 
-# extract image id from button by searching nearest /images/ link
+# -------- DOM helpers (image id extraction etc.) --------
 def extract_image_id_from_button(btn):
+    # JS walk up tree to find nearest /images/<id> link
     js = r"""
     node => {
       try {
@@ -101,8 +131,8 @@ def extract_image_id_from_button(btn):
     except Exception:
         return None
 
-# parse like count inside button text
 def get_like_count_from_button(btn):
+    # parse numeric like count text from button
     js = r"""
     node => {
       try {
@@ -118,8 +148,9 @@ def get_like_count_from_button(btn):
     except Exception:
         return 0
 
-# click and confirm like
+# -------- click + confirm --------
 def click_and_confirm_like(btn, timeout=LIKE_CONFIRM_TIMEOUT, retries=CLICK_RETRY):
+    # click reaction button and confirm via attributes or count change
     try:
         initial_count = get_like_count_from_button(btn)
     except Exception:
@@ -164,52 +195,236 @@ def click_and_confirm_like(btn, timeout=LIKE_CONFIRM_TIMEOUT, retries=CLICK_RETR
         return False
     return False
 
-# save session state
+# -------- session saving helper --------
 def save_session_state(context):
+    # save Playwright storage state to file
     try:
         context.storage_state(path=SESSION_FILE)
         print("INFO: session saved to", SESSION_FILE)
     except Exception as e:
         print("WARNING: failed to save session:", e)
 
-# ensure session and page available
-def ensure_session_and_page(playwright):
+# -------- session validation and manual-login flow --------
+def ensure_valid_session(playwright):
+    # Try to restore session. If invalid -> open system browser to login URL and WAIT for user.
     browser = playwright.chromium.launch(headless=HEADLESS_MODE)
+    # try to restore saved session
     if os.path.exists(SESSION_FILE):
         try:
             context = browser.new_context(storage_state=SESSION_FILE,
                                           viewport={"width": 1366, "height": 768})
             page = context.new_page()
-            page.goto("https://civitai.com/images?sort=Newest", wait_until="domcontentloaded")
             try:
-                signin = page.query_selector('a:has-text("Sign in")')
+                page.goto(IMAGES_URL, wait_until="domcontentloaded", timeout=15000)
+            except Exception:
+                pass
+            # detect sign-in presence
+            try:
+                signin = page.query_selector('a:has-text("Sign in")') or page.query_selector('a:has-text("Log in")')
             except Exception:
                 signin = None
             if signin:
-                print("INFO: saved session appears expired — will obtain new magic link")
+                print("INFO: saved session appears expired or invalid.")
             else:
                 print("INFO: loaded session from", SESSION_FILE)
                 return browser, context, page
         except Exception as e:
-            print("WARNING: error loading saved session:", e)
+            print("WARNING: failed to load saved session:", e)
 
-    context = browser.new_context(viewport={"width": 1366, "height": 768})
-    page = context.new_page()
-    print("INFO: obtaining magic link from email...")
-    login_link = get_civitai_login_link()
-    print("INFO: opening magic link...")
-    page.goto(login_link, wait_until="domcontentloaded")
-    time.sleep(SESSION_SAVE_DELAY)
-    save_session_state(context)
+    # no valid session -> open system browser and wait for user to complete login
     try:
-        page.goto("https://civitai.com/images?sort=Newest", wait_until="domcontentloaded")
-    except Exception:
-        pass
-    return browser, context, page
+        print("INFO: no valid session found. Opening system browser for manual login:", LOGIN_FIXED_URL)
+        webbrowser.open(LOGIN_FIXED_URL)
+        print("INFO: Please complete login (solve CAPTCHA if present) in your system browser.")
+        input("After you finished logging in in your browser press Enter here to continue...")
+    except KeyboardInterrupt:
+        print("\nINFO: interrupted by user during manual login wait.")
+        try:
+            browser.close()
+        except Exception:
+            pass
+        try:
+            sys.exit(0)
+        except SystemExit:
+            os._exit(0)
+    except Exception as e:
+        print("WARNING: failed to open system browser:", e)
+        try:
+            browser.close()
+        except Exception:
+            pass
+        return browser, None, None
 
-# required function name: WAIT_FOR_USER_RESPONSE
+    # user signaled ready -> attempt to fetch magic link from email and complete login in Playwright
+    # try multiple attempts (small loop) because email delivery may be delayed
+    attempts = 6
+    wait_between_attempts = 5  # seconds
+    login_link = None
+    for i in range(attempts):
+        try:
+            print(f"INFO: attempting to fetch login email (attempt {i+1}/{attempts})...")
+            login_link = get_civitai_login_link()
+            if login_link:
+                print("INFO: login link retrieved from email.")
+                break
+        except Exception as e:
+            print("INFO: login link not found yet:", str(e))
+        if i < attempts - 1:
+            print(f"INFO: waiting {wait_between_attempts} seconds before next email check...")
+            time.sleep(wait_between_attempts)
+
+    if not login_link:
+        print("ERROR: could not obtain login link from email after multiple attempts. Aborting manual flow.")
+        try:
+            browser.close()
+        except Exception:
+            pass
+        # return context None so caller can decide what to do
+        return browser, None, None
+
+    # open the magic link inside Playwright context to finalize login and save session
+    try:
+        context = browser.new_context(viewport={"width": 1366, "height": 768})
+        page = context.new_page()
+        print("INFO: opening magic login link inside Playwright to finalize session...")
+        try:
+            page.goto(login_link, wait_until="domcontentloaded", timeout=20000)
+        except Exception:
+            try:
+                page.goto(login_link)
+            except Exception as e:
+                print("ERROR: failed to open login link inside Playwright:", e)
+                try:
+                    browser.close()
+                except Exception:
+                    pass
+                return browser, None, None
+        # give site a moment to finish login and redirect
+        time.sleep(SESSION_SAVE_DELAY)
+        # save session state
+        try:
+            save_session_state(context)
+        except Exception:
+            pass
+        # navigate to images page to continue
+        try:
+            page.goto(IMAGES_URL, wait_until="domcontentloaded", timeout=15000)
+        except Exception:
+            pass
+        print("INFO: manual login flow complete, session saved.")
+        return browser, context, page
+    except Exception as e:
+        print("ERROR: completing login in Playwright failed:", e)
+        try:
+            browser.close()
+        except Exception:
+            pass
+        return browser, None, None
+
+# -------- Updater: branch-based (kept) --------
+def is_git_repo():
+    return os.path.isdir(".git")
+
+def get_remote_origin_url():
+    try:
+        res = subprocess.run(["git", "config", "--get", "remote.origin.url"], capture_output=True, text=True, check=True)
+        url = res.stdout.strip()
+        return url if url else None
+    except Exception:
+        return None
+
+def current_and_remote_branch_commits(branch):
+    try:
+        subprocess.run(["git", "fetch", "origin"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        try:
+            r1 = subprocess.run(["git", "rev-parse", branch], check=True, capture_output=True, text=True)
+            local = r1.stdout.strip()
+        except Exception:
+            r1 = subprocess.run(["git", "rev-parse", "HEAD"], check=True, capture_output=True, text=True)
+            local = r1.stdout.strip()
+        try:
+            r2 = subprocess.run(["git", "rev-parse", f"origin/{branch}"], check=True, capture_output=True, text=True)
+            remote = r2.stdout.strip()
+        except Exception:
+            remote = None
+        return local, remote
+    except Exception:
+        return None, None
+
+def check_for_updates_branch_based():
+    if not is_git_repo():
+        print("INFO: not a git repository; update check skipped")
+        return False
+    local, remote = current_and_remote_branch_commits(UPDATE_BRANCH)
+    if not local or not remote:
+        print("INFO: could not determine branch commits; skipping update check")
+        return False
+    if local != remote:
+        print(f"INFO: update available on branch '{UPDATE_BRANCH}' (local != origin/{UPDATE_BRANCH})")
+        return True
+    print(f"INFO: no updates found on branch '{UPDATE_BRANCH}'")
+    return False
+
+def perform_branch_update_and_restart():
+    if not is_git_repo():
+        print("WARNING: not a git repository; cannot perform branch update")
+        return False
+    cfg_path = Path("config.py")
+    backup_path = None
+    try:
+        if cfg_path.exists():
+            backup_dir = Path(tempfile.mkdtemp(prefix="cfg_backup_"))
+            backup_path = backup_dir / "config.py"
+            shutil.copy2(cfg_path, backup_path)
+            print("INFO: config.py backed up to", str(backup_path))
+        print(f"INFO: fetching origin and switching to branch '{UPDATE_BRANCH}'...")
+        subprocess.run(["git", "fetch", "origin"], check=True)
+        try:
+            subprocess.run(["git", "checkout", UPDATE_BRANCH], check=True)
+        except Exception:
+            subprocess.run(["git", "checkout", "-b", UPDATE_BRANCH, f"origin/{UPDATE_BRANCH}"], check=True)
+        subprocess.run(["git", "pull", "origin", UPDATE_BRANCH], check=True)
+        print("INFO: git pull completed")
+        if backup_path and backup_path.exists():
+            shutil.copy2(backup_path, cfg_path)
+            print("INFO: config.py restored from backup")
+        print("INFO: restarting script with updated code...")
+        os.execv(sys.executable, [sys.executable] + sys.argv)
+    except Exception as e:
+        print("ERROR: update failed:", e)
+        try:
+            if backup_path and backup_path.exists():
+                shutil.copy2(backup_path, cfg_path)
+                print("INFO: config.py restored after failure")
+        except Exception:
+            pass
+        return False
+    finally:
+        try:
+            if backup_path:
+                shutil.rmtree(backup_path.parent, ignore_errors=True)
+        except Exception:
+            pass
+
+def check_and_prompt_update_branch_flow():
+    try:
+        available = check_for_updates_branch_based()
+        if not available:
+            return False
+        if AUTO_UPDATE:
+            print("INFO: AUTO_UPDATE enabled; performing update now...")
+            return perform_branch_update_and_restart()
+        ans = input(f"Update available on branch '{UPDATE_BRANCH}'. Update now? [Y/n]: ").strip().lower()
+        if ans in ("", "y", "yes"):
+            return perform_branch_update_and_restart()
+        print("INFO: update skipped by user.")
+        return False
+    except Exception as e:
+        print("WARNING: update check failed:", e)
+        return False
+
+# -------- open reactions panel (keeps previous behavior) --------
 def WAIT_FOR_USER_RESPONSE():
-    # prompt the user to make likes visible manually and press Enter
     try:
         input("PAUSE: could not auto-show reactions. Please make likes visible manually and press Enter to continue...")
     except KeyboardInterrupt:
@@ -219,31 +434,26 @@ def WAIT_FOR_USER_RESPONSE():
         except SystemExit:
             os._exit(0)
 
-# improved open_reactions_panel with wait + fallback to user prompt
 def open_reactions_panel(page):
-    # try to wait a short time for a reactions-open button and click it once
     try:
-        # wait up to 3 seconds for the SVG-based button
+        btn = None
         try:
             btn = page.wait_for_selector(REACTIONS_PANEL_SVG, timeout=3000)
         except Exception:
             btn = None
 
-        # if not found, try the general mood-smile selector (also wait a short time)
         if not btn:
             try:
                 btn = page.wait_for_selector(REACTIONS_PANEL_BUTTON, timeout=1000)
             except Exception:
                 btn = None
 
-        # if still not found, try a quick query (no wait)
         if not btn:
             try:
                 btn = page.query_selector(REACTIONS_PANEL_SVG)
             except Exception:
                 btn = None
 
-        # if found — click and return True
         if btn:
             try:
                 btn.scroll_into_view_if_needed()
@@ -256,18 +466,15 @@ def open_reactions_panel(page):
                 print("WARNING: error clicking reactions panel button:", e)
                 return False
 
-        # not found — if configured, wait for user response
         if AUTO_WAIT_FOR_USER:
             print("INFO: reactions panel button not found automatically; waiting for user action...")
             WAIT_FOR_USER_RESPONSE()
-            # after user responded, attempt one more short find & no-fail click
             try:
                 btn2 = page.query_selector(REACTIONS_PANEL_SVG) or page.query_selector(REACTIONS_PANEL_BUTTON)
                 if btn2:
                     try:
                         btn2.scroll_into_view_if_needed()
                         time.sleep(0.12)
-                        # do not fail if click throws
                         try:
                             btn2.click()
                             print("INFO: reactions panel button clicked after user action")
@@ -279,7 +486,6 @@ def open_reactions_panel(page):
                     return True
             except Exception:
                 pass
-            # if still not found — continue without it
             print("INFO: reactions panel still not found after user action; proceeding")
             return False
         else:
@@ -290,7 +496,7 @@ def open_reactions_panel(page):
         print("WARNING: open_reactions_panel error:", e)
         return False
 
-# main routine
+# -------- Main liking routine --------
 def auto_like_images():
     print("INFO: Starting CivitAI Auto Liker")
     print(f"INFO: Account: {mask_email(YOUR_EMAIL)}")
@@ -299,16 +505,26 @@ def auto_like_images():
     print(f"INFO: loaded {len(liked_ids)} previously liked image ids")
 
     with sync_playwright() as p:
-        browser, context, page = ensure_session_and_page(p)
+        # ensure session; if not present this function will open system browser and WAIT for user,
+        # then attempt to fetch magic link and finalize login inside Playwright
+        browser, context, page = ensure_valid_session(p)
+
+        if context is None or page is None:
+            print("ERROR: no active Playwright context/page after login flow. Exiting.")
+            try:
+                if browser:
+                    browser.close()
+            except Exception:
+                pass
+            return
 
         try:
-            page.goto("https://civitai.com/images?sort=Newest", wait_until="domcontentloaded")
+            page.goto(IMAGES_URL, wait_until="domcontentloaded")
         except Exception:
             pass
 
         clicked = open_reactions_panel(page)
         if not clicked and AUTO_WAIT_FOR_USER:
-            # open_reactions_panel already waits for user if configured
             pass
 
         liked_count = 0
@@ -316,7 +532,6 @@ def auto_like_images():
         print(f"INFO: target new likes this run: {TARGET_LIKES}")
 
         while liked_count < TARGET_LIKES:
-            # try primary then fallback selector
             buttons = []
             try:
                 buttons = page.query_selector_all(BUTTON_SELECTOR_PRIMARY)
@@ -408,5 +623,13 @@ def auto_like_images():
         except Exception:
             pass
 
+# -------- Entrypoint --------
 if __name__ == "__main__":
+    # pre-update check (branch-based)
+    try:
+        check_and_prompt_update_branch_flow()
+    except Exception as e:
+        print("WARNING: update flow failed:", e)
+
+    # run main logic
     auto_like_images()
