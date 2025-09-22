@@ -1,9 +1,3 @@
-# civitai_auto_like.py
-# Full main script. If session invalid -> open system browser to login URL and WAIT for user.
-# After user presses Enter, fetch magic link via email_processor, complete login in Playwright,
-# save session, then continue with liking loop.
-# Single-line comments, prints in English
-
 import os
 import sys
 import time
@@ -633,3 +627,4 @@ if __name__ == "__main__":
 
     # run main logic
     auto_like_images()
+
